@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/rpc"
+	"os"
 	//	"net/rpc"
 	//	"fmt"
 	//	"time"
@@ -12,8 +13,10 @@ import (
 )
 
 var nextAddr string
+var shutDownSent = false
 
 var SingVerseHandler = "BuddyOperations.SingVerse"
+var ShutDownHandler = "BuddyOperations.ShutDown"
 
 type Response struct {
 	Message bool
@@ -32,14 +35,38 @@ func (b *BuddyOperations) SingVerse(req Request, res *Response) (err error) {
 	return
 }
 
+func (b *BuddyOperations) ShutDown(req Request, baseRes *Response) (err error) {
+	if shutDownSent == false {
+		res := new(Response)
+		res.Message = true
+		client, err := rpc.Dial("tcp", nextAddr)
+		if err != nil {
+			panic(err)
+		}
+		client.Go(ShutDownHandler, Request{0}, res, nil)
+	}
+	os.Exit(0)
+	return
+}
+
 func doVerse(n int) {
 	if n > 0 {
 		fmt.Println(n, "bottles of beer on the wall,", n, "bottles of beer. Take one down, pass it around...")
 		res := new(Response)
-		client, _ := rpc.Dial("tcp", nextAddr)
+		client, err := rpc.Dial("tcp", nextAddr)
+		if err != nil {
+			panic(err)
+		}
 		client.Go(SingVerseHandler, Request{n - 1}, res, nil)
 	} else {
 		fmt.Println("The crippling alcoholism has hit...")
+		res := new(Response)
+		client, err := rpc.Dial("tcp", nextAddr)
+		if err != nil {
+			panic(err)
+		}
+		shutDownSent = true
+		client.Go(ShutDownHandler, Request{0}, res, nil)
 	}
 }
 
